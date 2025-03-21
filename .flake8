@@ -1,0 +1,18 @@
+[flake8]
+max-line-length = 89
+extend-ignore = E203,E701,W291
+exclude =
+    */migrations/*,
+    **/documents.py
+    __pycache__,
+    manage.py,
+    settings.py
+    .git,
+    __pycache__,
+    docs/source/conf.py,
+    old,
+    build,
+    dist
+    /**/**/documents.*
+    /**/**/database_seeder.py
+    /**/**/validators.py

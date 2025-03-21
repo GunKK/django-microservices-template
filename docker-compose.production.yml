@@ -1,0 +1,57 @@
+version: "3.7"
+
+services:
+  user_service:
+    build:
+      context: ./services/user
+      dockerfile: Dockerfile.prod
+    restart: always
+    command: gunicorn app.wsgi:application --host 0.0.0.0 --port 8080 --log-level info
+    volumes:
+      - ./app:/home/app/web/app
+      - ./core:/home/app/web/core
+      - /mnt/data/static:/home/app/web/static
+      - /mnt/data/media:/home/app/web/media
+      - ./services/user/pyproject.toml:/home/app/web/pyproject.toml
+      - ./services/user/poetry.lock:/home/app/web/poetry.lock
+    ports:
+      - 8081:8080
+
+  redis:
+    image: "redis:latest"
+    restart: always
+    ports:
+      - 6379:6379
+    networks:
+      - redis_network
+  celery:
+    build:
+      context: ./services/celery
+      dockerfile: Dockerfile.prod
+    command: celery -A app.celery worker --loglevel=info
+    restart: always
+    volumes:
+      - ./core:/home/app/web/core
+    depends_on:
+      - redis
+    networks:
+      - redis_network
+
+  nodejs_service:
+    build:
+      context: ./services/nodejs-socket
+      dockerfile: Dockerfile.prod
+    restart: always
+    command: yarn prod
+    volumes:
+      - node_modules_volume:/usr/src/service/node_modules
+    ports:
+      - 9000:9000
+      - 50051:50051
+
+volumes:
+  node_modules_volume:
+
+networks:
+  redis_network:
+    driver: bridge

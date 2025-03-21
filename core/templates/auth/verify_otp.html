@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Verify Your Account - OTP Code</title>
+    <style>
+        body { font-family: Arial, sans-serif; color: #333; }
+        .container { padding: 20px; border: 1px solid #e0e0e0; max-width: 600px; margin: auto; }
+        h1 {
+            font-size: 24px;
+            color: #4CAF50;
+            text-align: center;
+        }
+        p {
+            font-size: 16px;
+            line-height: 1.6;
+        }
+        .otp { font-size: 40px; font-weight: bold; color: #FF5722; text-align: center; letter-spacing: 8px;}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Dear customer</h1>
+        <p>Thank you for registering with us! To complete your account setup, please enter the following verification code:</p>
+        <p class="otp">OTP Code: {{ otp }}</p>
+        <p>This code is valid for a limited time and will expire in 3 minutes/hours. Please do not share it with anyone, and ensure it is entered exactly as shown.</p>
+        <p>If you did not request this verification, please ignore this email.</p>
+        <p>Best regards,</p>
+        <p><b>Data team</b></p>
+        <p> FINEPRO AUTOMATION CO., LTD</p>
+
+    </div>
+</body>
+</html>

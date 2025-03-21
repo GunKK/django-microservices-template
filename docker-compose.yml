@@ -1,0 +1,107 @@
+version: "3.7"
+
+services:
+  user_service:
+    build:
+      context: ./services/user
+      dockerfile: Dockerfile
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./app:/usr/src/service/app
+      - ./core:/usr/src/service/core
+      - ./services/user/apis:/usr/src/service/apis
+      - static_volume:/usr/src/service/static
+      - media_volume:/usr/src/service/media
+      - ./services/user/pyproject.toml:/usr/src/service/pyproject.toml
+      - ./services/user/poetry.lock:/usr/src/service/poetry.lock
+    ports:
+      - 9001:8000
+    depends_on:
+      - redis
+      - db
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    networks:
+      - redis_network
+      - dbnetwork
+
+  redis:
+    image: "redis:latest"
+    ports:
+      - 6379:6379
+    networks:
+      - redis_network
+
+  celery:
+    build:
+      context: ./services/celery
+      dockerfile: Dockerfile
+    command: celery -A app.celery worker --loglevel=info
+    volumes:
+      - ./services/celery/app:/usr/src/service/app
+      - ./core:/usr/src/service/core
+    depends_on:
+      - redis
+    networks:
+      - redis_network
+      - dbnetwork
+
+  nodejs:
+    build:
+      context: ./services/nodejs-socket
+      dockerfile: Dockerfile
+    command: yarn dev
+    volumes:
+      - ./services/nodejs-socket:/usr/src/service
+      - node_modules_volume:/usr/src/service/node_modules
+    ports:
+      - 9000:9000
+      - 50051:50051
+    depends_on:
+      - redis
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    networks:
+      - redis_network
+      - dbnetwork
+
+  nginx:
+    build: ./nginx
+    volumes:
+      - static_volume:/home/app/web/static
+      - media_volume:/home/app/web/media
+    ports:
+      - "${FORWARD_PORT}:80"
+    depends_on:
+      - user_service
+    networks:
+      - nginx_network
+
+  db:
+    image: postgres:16
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    ports:
+      - 5434:5432
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+      - TZ=Asia/Ho_Chi_Minh
+    networks:
+      - dbnetwork
+
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:
+  node_modules_volume:
+
+networks:
+  redis_network:
+    driver: bridge
+  nginx_network:
+    driver: bridge
+  dbnetwork:
+    driver: bridge
+

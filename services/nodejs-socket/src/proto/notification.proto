@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+message NotificationRequest {
+  repeated int32  users = 1;
+}
+
+message NotificationResponse {
+  bool status = 1;
+  string message = 2;
+}
+
+service NotificationService {
+  rpc EmitNotification (NotificationRequest) returns (NotificationResponse);
+}
