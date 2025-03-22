@@ -29,6 +29,7 @@ pre-commit install
 - Run: `poetry remove package` to remove package
 - Run: `poetry lock` to update **poetry.lock**
 - Run: `pre-commit install` to ensure code quality before committing changes. (ignore format code —no-verify)
+- Run: `python manage.py makemigrations core --name xxxx_xxxx` to create a migration
 - Run: `python manage.py migrate` to migrate database
 - Run: `python manage.py runserver` to start dev environmenthont
 - Run: `python manage.py show_urls` to show all urls

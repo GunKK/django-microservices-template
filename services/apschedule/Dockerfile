@@ -1,0 +1,36 @@
+# pull official base image
+FROM python:3.12-slim
+
+ENV APP_HOME=/usr/src/service
+RUN mkdir $APP_HOME
+RUN mkdir $APP_HOME/app
+RUN mkdir $APP_HOME/core
+
+# set work directory
+WORKDIR /usr/src/service
+
+# set environment variables
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+ENV POETRY_VIRTUALENVS_CREATE=False
+ENV TZ=Asia/Ho_Chi_Minh
+
+# install psycopg2 dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    default-libmysqlclient-dev \
+    libpq-dev \
+    vim \
+    tzdata \
+    pkg-config \
+    netcat-traditional && \
+    rm -rf /var/lib/apt/lists/*
+
+# install dependencies
+RUN pip install -U pip poetry && \
+    rm -rf /root/.cache/pip
+COPY ./poetry.lock ./pyproject.toml ./
+RUN poetry install
+
+# copy folder
+COPY . $APP_HOME

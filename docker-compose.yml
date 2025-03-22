@@ -5,7 +5,7 @@ services:
     build:
       context: ./services/user
       dockerfile: Dockerfile
-    command: python manage.py runserver 0.0.0.0:8000
+    command: uvicorn app.asgi:application --host 0.0.0.0 --port 8000 --reload --log-level info
     volumes:
       - ./app:/usr/src/service/app
       - ./core:/usr/src/service/core
@@ -21,6 +21,46 @@ services:
       - db
     extra_hosts:
       - 'host.docker.internal:host-gateway'
+    networks:
+      - redis_network
+      - dbnetwork
+    
+  notification_service:
+    build:
+      context: ./services/notification
+      dockerfile: Dockerfile
+    command: uvicorn app.asgi:application --host 0.0.0.0 --port 8000 --reload --log-level info
+    volumes:
+      - ./app:/usr/src/service/app
+      - ./core:/usr/src/service/core
+      - ./services/notification/apis:/usr/src/service/apis
+      - static_volume:/usr/src/service/static
+      - media_volume:/usr/src/service/media
+      - ./services/notification/pyproject.toml:/usr/src/service/pyproject.toml
+      - ./services/notification/poetry.lock:/usr/src/service/poetry.lock
+    ports:
+      - 9012:8000
+    depends_on:
+      - db
+      - redis
+    networks:
+      - redis_network
+      - dbnetwork
+  
+  apschedule:
+    build:
+      context: ./services/apschedule
+      dockerfile: Dockerfile
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./services/apschedule/app:/usr/src/service/app
+      - ./core:/usr/src/service/core
+      - ./services/apschedule/pyproject.toml:/usr/src/service/pyproject.toml
+      - ./services/apschedule/poetry.lock:/usr/src/service/poetry.lock
+
+    depends_on:
+      - redis
+      - db
     networks:
       - redis_network
       - dbnetwork

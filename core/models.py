@@ -4,7 +4,7 @@ from django.db import models
 from django_extensions.db.models import TimeStampedModel
 from django_softdelete.models import SoftDeleteModel
 
-from core.constant import RepairFormStatusEnum
+from core.constant import USER_DEFAULT_SYSTEM, NotificationTypeEnum
 
 from .managers import UserManager
 
@@ -41,3 +41,20 @@ class User(AbstractBaseUser, TimeStampedModel, SoftDeleteModel):
     @property
     def full_name(self) -> str:
         return f"{self.first_name} {self.last_name}".strip()
+
+class Notification(TimeStampedModel):
+    user = models.ForeignKey(
+        User, on_delete=models.SET_DEFAULT, default=USER_DEFAULT_SYSTEM, null=True
+    )
+    notify_type = models.IntegerField(
+        default=NotificationTypeEnum.SYSTEM_NOTIFICATION.value
+    )
+    data = models.JSONField(null=True, blank=True)
+    is_read = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Notification for {self.user.full_name} - {self.notify_type}"
+
+    class Meta:
+        db_table = "notifications"
+        ordering = ["-created"]

@@ -14,10 +14,10 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+from celery.schedules import crontab
 from dotenv import load_dotenv
 
 load_dotenv()
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -66,23 +66,18 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.TokenAuthentication",
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
-    "DEFAULT_PERMISSION_CLASSES": ("core.middlewares.authenticate.AuthenticateMiddleware",),
-    # "DEFAULT_PERMISSION_CLASSES": (
-    #     "core.middlewares.authenticate.AuthenticateMiddleware",
-    #     "core.middlewares.active_account.ActiveAccountMiddleware",
-    # ),
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "core.exceptions.custom_exception_handler",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend",),
-    "COERCE_DECIMAL_TO_STRING": False,
 }
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=15),
     "ROTATE_REFRESH_TOKENS": True,
-    "BLACKLIST_AFTER_ROTATION": False,
+    "BLACKLIST_AFTER_ROTATION": True,
     "ALGORITHM": "HS256",
     "SIGNING_KEY": os.environ.get("SECRET_KEY"),
     "VERIFYING_KEY": None,
@@ -103,10 +98,9 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "debug_toolbar.middleware.DebugToolbarMiddleware",
-    # "corsheaders.middleware.CorsMiddleware",
-    # "core.middlewares.blacklist_access_token.BlacklistAccessTokenMiddleware",
-    # "core.middlewares.translate.TranslateMiddleware",
-    # "simple_history.middleware.HistoryRequestMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
+    "core.middlewares.blacklist_access_token.BlacklistAccessTokenMiddleware",
+    "simple_history.middleware.HistoryRequestMiddleware",
 ]
 
 CORS_ALLOW_ALL_ORIGINS = True
@@ -131,7 +125,6 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "app.wsgi.application"
-ASGI_APPLICATION = "app.asgi.application"
 
 
 # Database
@@ -139,13 +132,12 @@ ASGI_APPLICATION = "app.asgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql_psycopg2", # mssql config for sql server
+        "ENGINE": "django.db.backends.postgresql_psycopg2",
         "NAME": os.environ.get("DB_NAME"),
         "USER": os.environ.get("DB_USER"),
         "PASSWORD": os.environ.get("DB_PASSWORD"),
         "HOST": os.environ.get("DB_HOST"),
         "PORT": os.environ.get("DB_PORT"),
-        # "OPTIONS": {"driver": "ODBC Driver 17 for SQL Server",}
     }
 }
 
@@ -206,8 +198,8 @@ EMAIL_HOST = os.environ.get("EMAIL_HOST")
 EMAIL_PORT = os.environ.get("EMAIL_PORT")
 EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
-EMAIL_USE_TLS = False  # True when port is 587
-EMAIL_USE_SSL = True  # True when port port 465
+EMAIL_USE_TLS = False
+EMAIL_USE_SSL = False
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Task manegement API Documentation",
@@ -218,7 +210,31 @@ SPECTACULAR_SETTINGS = {
     "COMPONENT_SPLIT_REQUEST": True,  # Allow upload binary file
 }
 
-CELERY_BEAT_SCHEDULE = {}
+# path lỗi
+
+CELERY_BEAT_SCHEDULE = {
+    "update-task-status-every-day": {
+        "task": "app.celery.update_project_status",
+        "schedule": crontab(
+            hour=os.getenv("CRON_JOBS_TIME_HOUR", "00"),
+            minute=os.getenv("CRON_JOBS_TIME_MINUTE", "00"),
+        ),
+    },
+    "update-project-status-every-day": {
+        "task": "app.celery.update_task_status",
+        "schedule": crontab(
+            hour=os.getenv("CRON_JOBS_TIME_HOUR", "00"),
+            minute=os.getenv("CRON_JOBS_TIME_MINUTE", "00"),
+        ),
+    },
+    "update-start-task-every-day": {
+        "task": "app.celery.update_start_task",
+        "schedule": crontab(
+            hour=os.getenv("CRON_JOBS_TIME_HOUR", "00"),
+            minute=os.getenv("CRON_JOBS_TIME_MINUTE", "00"),
+        ),
+    },
+}
 
 CELERY_BROKER_URL = os.getenv("CELERY_REDIS_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = os.getenv("CELERY_REDIS_URL", "redis://localhost:6379/0")
@@ -257,5 +273,3 @@ CHANNEL_LAYERS = {
 # APPEND_SLASH = False
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
-
-SIMPLE_HISTORY_HISTORY_CHANGE_REASON_USE_TEXT_FIELD = True

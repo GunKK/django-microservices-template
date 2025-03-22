@@ -1,0 +1,26 @@
+#  Git
+.git
+.gitignore
+
+# Docker
+.docker
+
+# Python
+__pycache__/
+*/__pycache__/
+*/*/__pycache__/
+*/*/*/__pycache__/
+
+# Environments
+# .env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# media file
+media/
+
+logs/
