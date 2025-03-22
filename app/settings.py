@@ -103,7 +103,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "debug_toolbar.middleware.DebugToolbarMiddleware",
-    # "corsheaders.middleware.CorsMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     # "core.middlewares.blacklist_access_token.BlacklistAccessTokenMiddleware",
     # "core.middlewares.translate.TranslateMiddleware",
     # "simple_history.middleware.HistoryRequestMiddleware",
