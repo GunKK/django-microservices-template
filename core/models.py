@@ -10,7 +10,7 @@ from .managers import UserManager
 
 
 class User(AbstractBaseUser, TimeStampedModel, SoftDeleteModel):
-    email = models.EmailField(unique=True, null=True, max_length=255)
+    username = models.CharField(unique=True, null=True, max_length=255)
     first_name = models.CharField(max_length=255, null=True)
     last_name = models.CharField(max_length=255, null=True)
     is_active = models.BooleanField(default=True)
@@ -29,14 +29,14 @@ class User(AbstractBaseUser, TimeStampedModel, SoftDeleteModel):
 
     objects = UserManager()
 
-    USERNAME_FIELD = "email"
+    USERNAME_FIELD = "username"
     REQUIRED_FIELDS = ["first_name", "last_name", "role", "password"]
 
     class Meta:
         db_table = "users"
 
     def __str__(self):
-        return self.email
+        return self.username
 
     @property
     def full_name(self) -> str:

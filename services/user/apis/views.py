@@ -51,7 +51,7 @@ class AuthenViewSet(viewsets.ViewSet):
         if serializer.is_valid():
             user = authenticate(
                 request,
-                username=serializer.validated_data["email"].lower(),
+                username=serializer.validated_data["username"].lower(),
                 password=serializer.validated_data["password"],
             )
             if user:
@@ -72,7 +72,7 @@ class AuthenViewSet(viewsets.ViewSet):
                 )
 
             return Response(
-                {"status": False, "message": "Email or password is incorrect!"},
+                {"status": False, "message": "username or password is incorrect!"},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
