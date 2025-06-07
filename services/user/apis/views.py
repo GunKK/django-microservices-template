@@ -5,9 +5,9 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.response import Response
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
+from core.jwt import MyTokenObtainPairSerializer
 
 from core.serializers.user_serializers import (
     RefreshTokenSerializer,
@@ -15,7 +15,7 @@ from core.serializers.user_serializers import (
     UserLoginSerializer,
     UserSerializerWithToken,
 )
-from core.utils import blacklist_token, response_errors
+from core.utils import global_response_errors
 
 from .documents import (
     login_user_document,
@@ -40,7 +40,8 @@ class AuthenViewSet(viewsets.ViewSet):
                 status=status.HTTP_201_CREATED,
             )
 
-        return response_errors(serializer.errors)
+        return global_response_errors(serializer.errors)
+
 
     @extend_schema(**login_user_document)
     @action(methods=["post"], detail=False, url_path="login")
@@ -51,11 +52,11 @@ class AuthenViewSet(viewsets.ViewSet):
         if serializer.is_valid():
             user = authenticate(
                 request,
-                username=serializer.validated_data["email"].lower(),
+                username=serializer.validated_data["username"].lower(),
                 password=serializer.validated_data["password"],
             )
             if user:
-                refresh = TokenObtainPairSerializer.get_token(user)
+                refresh = MyTokenObtainPairSerializer.get_token(user)
                 return Response(
                     {
                         "status": True,
@@ -72,11 +73,12 @@ class AuthenViewSet(viewsets.ViewSet):
                 )
 
             return Response(
-                {"status": False, "message": "Email or password is incorrect!"},
+                {"status": False, "message": "Username or password is incorrect!"},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        return response_errors(serializer.errors)
+        return global_response_errors(serializer.errors)
+
 
     @action(methods=["post"], detail=False, url_path="logout")
     def logout_user(self, request):
@@ -84,7 +86,7 @@ class AuthenViewSet(viewsets.ViewSet):
             refresh_token = RefreshToken(request.data.get("refresh_token"))
             if not refresh_token:
                 raise AuthenticationFailed("No refresh token provided.")
-            blacklist_token(request.headers.get("Authorization")[7:])
+            request.user.set_new_token_version()
             refresh_token.blacklist()
             return Response(
                 {"status": True, "message": "Logout successfully!"},
@@ -96,6 +98,7 @@ class AuthenViewSet(viewsets.ViewSet):
             raise AuthenticationFailed(f"{str(e)}!")
 
 
+
 # refresh token view
 class CustomTokenRefreshView(TokenRefreshView):
     @extend_schema(**refresh_token_document)
@@ -103,19 +106,22 @@ class CustomTokenRefreshView(TokenRefreshView):
         serializer = RefreshTokenSerializer(data=request.data)
         if serializer.is_valid():
             access_token = serializer.validated_data["access_token"]
-            refresh_token = serializer.validated_data["refresh_token"]
-            if request.headers.get("Authorization"):
-                blacklist_token(request.headers.get("Authorization")[7:])
+            refresh_token = serializer.validated_data.get("refresh_token")
+            user = serializer.validated_data.get("user")
+
             return Response(
                 {
                     "status": True,
-                    "data": {
-                        "access_token": str(access_token),
-                        "refresh_token": str(refresh_token),
-                    },
+                    "data": UserSerializerWithToken(
+                        user,
+                        context={
+                            "access_token": str(access_token),
+                            "refresh_token": str(refresh_token),
+                        },
+                    ).data,
                     "message": "Refresh token successfully!",
                 },
                 status=status.HTTP_200_OK,
             )
 
-        return response_errors(serializer.errors)
+        return global_response_errors(serializer.errors)
