@@ -1,14 +1,18 @@
-from datetime import datetime
+import os
+import re
+import shutil
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import List
 
-from django.core.cache import cache
 from django.db.models import Model, Q
 from django.utils import timezone
 from PIL import Image
 from rest_framework import serializers, status
 from rest_framework.exceptions import NotFound, ParseError
 from rest_framework.response import Response
+
+from core.constant import DIR_TO_UPLOAD_MAPPER, PERMISSIONS_LIST, UI_PERMISSION_MAPPING
 
 
 def response_errors(errors):
@@ -34,13 +38,6 @@ def convert_to_dict(error_list):
 def format_response(errors):
     error_message = next(iter(errors.values()))[0]
     return error_message
-
-
-# A simple function to blacklist the access token
-def blacklist_token(token):
-    cache.set(
-        f"blacklisted_access_token_{token}", True, timeout=60 * 60
-    )  # Example: 1 hours
 
 
 def end_of_today():
@@ -76,11 +73,21 @@ def update_name_with_count(model, name, obj):
         )
 
 
+def convert_to_snake_case(text):
+    if isinstance(text, str):
+        text = text.strip()
+        text = re.sub(r"[^a-zA-Z0-9._-]", "_", text)
+        text = text.lower()
+    return text
+
+
 def upload_to_directory(instance, filename):
     # Build storage paths based on instance information
-    return (
-        f"uploads/{instance.owner.id}/{instance.__class__.__name__.lower()}/{filename}"
+    identify_code = convert_to_snake_case(
+        getattr(instance, DIR_TO_UPLOAD_MAPPER[instance.__class__.__name__.lower()])
     )
+    # uploads/device/MC1/file_xxxx.jpg
+    return f"uploads/{instance.__class__.__name__.lower()}/{identify_code}/{filename}"
 
 
 def process_image(path):
@@ -97,14 +104,9 @@ def get_instance(model: Model, pk: int = None):
         instance = model.objects.get(pk=pk)
         return instance
     except model.DoesNotExist:
-        raise NotFound(
-            {
-                "status": False,
-                "message": f"No {model.__class__} matches the given query!",
-            }
-        )
+        raise NotFound(f"No {model.__name__} matches the given query!")
     except ValueError:
-        raise ParseError({"status": False, "message": f"Invalid {model.__class__} ID!"})
+        raise ParseError(f"Invalid {model.__name__} ID!")
 
 
 def get_deleted_instance(model: Model, pk: int = None):
@@ -112,14 +114,9 @@ def get_deleted_instance(model: Model, pk: int = None):
         instance = model.deleted_objects.get(pk=pk)
         return instance
     except model.DoesNotExist:
-        raise NotFound(
-            {
-                "status": False,
-                "message": f"No {model.__class__} matches the given query!",
-            }
-        )
+        raise NotFound(f"No {model.__name__} matches the given query!")
     except ValueError:
-        raise ParseError({"status": False, "message": f"Invalid {model.__class__} ID!"})
+        raise ParseError(f"Invalid {model.__name__} ID!")
 
 
 def get_global_instance(model: Model, pk: int = None):
@@ -127,14 +124,9 @@ def get_global_instance(model: Model, pk: int = None):
         instance = model.global_objects.get(pk=pk)
         return instance
     except model.DoesNotExist:
-        raise NotFound(
-            {
-                "status": False,
-                "message": f"No {model.__class__} matches the given query!",
-            }
-        )
+        raise NotFound(f"No {model.__name__} matches the given query!")
     except ValueError:
-        raise ParseError({"status": False, "message": f"Invalid {model.__class__} ID!"})
+        raise ParseError(f"Invalid {model.__name__} ID!")
 
 
 def calculate_average_percent(list):
@@ -158,14 +150,13 @@ def validate_max_length(value, max_length, field_name):
         )
     return value
 
+
 def format_date_filter(date_from: str, date_to: str) -> List[str]:
     try:
         target_date_from = datetime.strptime(date_from, "%Y-%m-%d").date()
         target_date_to = datetime.strptime(date_to, "%Y-%m-%d").date()
     except ValueError:
-        raise ParseError(
-            {"status": False, "message": "Date is not match format yyyy-mm-dd"}
-        )
+        raise ParseError("Date is not match format yyyy-mm-dd")
 
     start_of_day = datetime.combine(target_date_from, datetime.min.time())  # 00:00:00
     end_of_day = datetime.combine(
@@ -176,3 +167,129 @@ def format_date_filter(date_from: str, date_to: str) -> List[str]:
     start_of_day_str = start_of_day.strftime("%Y-%m-%d %H:%M:%S.%f%z")
     end_of_day_str = end_of_day.strftime("%Y-%m-%d %H:%M:%S.%f%z")
     return [start_of_day_str, end_of_day_str]
+
+
+def convert_bin_to_hex(bin_number):
+    return hex(int(bin_number, 2))[2:].upper()
+
+
+def convert_hex_to_bin(hex_number):
+    return bin(int(hex_number, 16))[2:].zfill(len(PERMISSIONS_LIST))
+
+
+def is_hex(value):
+    pattern = r"^[0-9A-Fa-f]+$"
+    return bool(re.match(pattern, value))
+
+
+def check_permissions_by_hex(hex_num, id_permission) -> bool:
+    bin_num = convert_hex_to_bin(hex_num)
+    return bool(int(bin_num[-int(id_permission)]))
+
+
+def get_current_shift_start(current_time):
+    # Determine the start time of the current shift
+    hour = current_time.hour
+
+    # Day shift: 8:00 - 20:00, night shift: 20:00 - 8:00
+    if 8 <= hour < 20:
+        # Day shift
+        return current_time.replace(hour=8, minute=0, second=0, microsecond=0)
+    else:
+        # Night shift
+        if hour < 8:
+            # If it's after midnight but before 8:00 AM
+            return (current_time - timedelta(days=1)).replace(
+                hour=20, minute=0, second=0, microsecond=0
+            )
+        else:
+            # If it's after 8:00 PM
+            return current_time.replace(hour=20, minute=0, second=0, microsecond=0)
+
+
+def get_start_of_shift():
+    return get_current_shift_start(datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def get_start_of_day():
+    return (
+        datetime.now()
+        .replace(hour=0, minute=0, second=0, microsecond=0)
+        .strftime("%Y-%m-%d %H:%M:%S")
+    )
+
+
+def get_start_of_week():
+    return (
+        (datetime.now() - timedelta(days=datetime.now().weekday()))
+        .replace(hour=0, minute=0, second=0, microsecond=0)
+        .strftime("%Y-%m-%d %H:%M:%S")
+    )
+
+
+def get_start_of_month():
+    return (
+        datetime.now()
+        .replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        .strftime("%Y-%m-%d %H:%M:%S")
+    )
+
+
+def fix_vector(vector, dim=10000):
+    vector = vector[:dim]
+    return vector + [0.0] * (dim - len(vector))
+
+
+def check_ui_permission(user, ui_permission_key):
+    """
+    Kiểm tra xem người dùng có quyền UI cụ thể không
+    """
+    if ui_permission_key not in UI_PERMISSION_MAPPING:
+        return False
+
+    backend_perm_value = UI_PERMISSION_MAPPING[ui_permission_key]
+    return check_permissions_by_hex(user.role.permissions, backend_perm_value)
+
+
+def get_access_token_from_request(request):
+    """
+    Extracts the JWT token from the request header.
+    Assumes the token is in the Authorization header.
+    """
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        return auth_header[7:]
+    return None
+
+
+def extract_first_error_message(errors):
+    """
+    Extract the first error message from nested serializer errors structure
+    """
+    if isinstance(errors, dict):
+        for key, value in errors.items():
+            if isinstance(value, dict):
+                result = extract_first_error_message(value)
+                if result:
+                    return result
+            elif isinstance(value, list) and value:
+                if isinstance(value[0], str):
+                    return value[0]
+                else:
+                    result = extract_first_error_message(value[0])
+                    if result:
+                        return result
+    elif isinstance(errors, list) and errors:
+        if isinstance(errors[0], str):
+            return errors[0]
+        else:
+            return extract_first_error_message(errors[0])
+    return None
+
+
+def global_response_errors(errors):
+    error_message = extract_first_error_message(errors)
+    return Response({
+        "status": False,
+        "message": error_message
+        },status=status.HTTP_400_BAD_REQUEST)

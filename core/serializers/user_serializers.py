@@ -8,7 +8,7 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.settings import api_settings
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from core import models
+from core.models import User
 from core.utils import validate_max_length
 
 
@@ -27,12 +27,12 @@ class UserSerializer(serializers.ModelSerializer):
             "blank": "Lastname cannot be empty!",
         },
     )
-    email = serializers.EmailField(
+    username = serializers.CharField(
         required=True,
         error_messages={
-            "required": "Please enter your email address!",
-            "invalid": "Enter a valid email address!",
-            "blank": "Email cannot be empty!",
+            "required": "Please enter your username address!",
+            "invalid": "Enter a valid username address!",
+            "blank": "Username cannot be empty!",
         },
     )
     password = serializers.CharField(
@@ -46,10 +46,10 @@ class UserSerializer(serializers.ModelSerializer):
     role = serializers.IntegerField(default=1)
 
     class Meta:
-        model = models.User
+        model = User
         fields = [
             "id",
-            "email",
+            "username",
             "password",
             "first_name",
             "last_name",
@@ -72,7 +72,7 @@ class UserSerializer(serializers.ModelSerializer):
         return representation
 
 
-class RegisterUserSerializer(serializers.ModelSerializer):
+class RegisterUserSerializer(serializers.Serializer):
     first_name = serializers.CharField(
         required=True,
         error_messages={
@@ -87,12 +87,12 @@ class RegisterUserSerializer(serializers.ModelSerializer):
             "blank": "Lastname cannot be empty!",
         },
     )
-    email = serializers.EmailField(
+    username = serializers.CharField(
         required=True,
         error_messages={
-            "required": "Please enter your email address!",
-            "invalid": "Enter a valid email address!",
-            "blank": "Email cannot be empty!",
+            "required": "Please enter your username address!",
+            "invalid": "Enter a valid username address!",
+            "blank": "Username cannot be empty!",
         },
     )
     password = serializers.CharField(
@@ -106,10 +106,10 @@ class RegisterUserSerializer(serializers.ModelSerializer):
     role = serializers.IntegerField(default=1)
 
     class Meta:
-        model = models.User
+        model = User
         fields = [
             "id",
-            "email",
+            "username",
             "password",
             "first_name",
             "last_name",
@@ -134,9 +134,9 @@ class RegisterUserSerializer(serializers.ModelSerializer):
                 )
         return data
 
-    def validate_email(self, value):
-        if models.User.objects.filter(email=value.lower()).exists():
-            raise serializers.ValidationError("Email already exists!")
+    def validate_username(self, value):
+        if User.objects.filter(username=value.lower()).exists():
+            raise serializers.ValidationError("Username already exists!")
         return value
 
     def validate_password(self, value):
@@ -152,20 +152,20 @@ class RegisterUserSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
-        validated_data["email"] = validated_data["email"].lower()
-        user = models.User(**validated_data)
-        user.set_password(validated_data["password"])
+        validated_data["username"] = validated_data["username"].lower()
+        user = User(**validated_data)
+        user.set_password(validated_data.get("password", "Defaultpassword@123"))
         user.save()
         return user
 
 
 class UserLoginSerializer(serializers.ModelSerializer):
-    email = serializers.EmailField(
+    username = serializers.CharField(
         required=True,
         error_messages={
-            "required": "Please enter email address!",
-            "invalid": "Enter a valid email address!",
-            "blank": "Email cannot be empty!",
+            "required": "Please enter username address!",
+            "invalid": "Enter a valid username address!",
+            "blank": "Username cannot be empty!",
         },
     )
     password = serializers.CharField(
@@ -177,8 +177,8 @@ class UserLoginSerializer(serializers.ModelSerializer):
     )
 
     class Meta:
-        model = models.User
-        fields = ["email", "password"]
+        model = User
+        fields = ["username", "password"]
         extra_kwargs = {"password": {"write_only": True}}
 
 
@@ -195,9 +195,16 @@ class RefreshTokenSerializer(serializers.Serializer):
             raise InvalidToken(f"{str(e)}!")
 
         if not refresh:
-            raise AuthenticationFailed("No refresh token provided.")
+            raise AuthenticationFailed("No refresh token provided!")
 
-        data = {"access_token": str(refresh.access_token)}
+        # Lấy thông tin user từ token
+        user_id = refresh.payload.get("user_id")
+        user = User.objects.get(id=user_id)
+        token_version = refresh.payload.get("token_version", None)
+        if not user.is_token_version_valid(token_version):
+            raise AuthenticationFailed("Token is invalid due to version mismatch!")
+
+        data = {"access_token": str(refresh.access_token), "user": user}
 
         if api_settings.ROTATE_REFRESH_TOKENS:
             if api_settings.BLACKLIST_AFTER_ROTATION:

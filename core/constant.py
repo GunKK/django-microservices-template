@@ -22,3 +22,20 @@ class NotificationTypeEnum(Enum):
     # system notification 1-20
     SYSTEM_NOTIFICATION = 1
     # define here
+
+
+PERMISSIONS_LIST = []
+
+permissions_enum_dict = {
+    name.upper().replace(" ", "_"): idx + 1
+    for idx, name in enumerate(PERMISSIONS_LIST)
+    if "future use" not in name.lower()
+}
+
+PermissionsEnum = Enum("PermissionsEnum", permissions_enum_dict)
+
+
+UI_PERMISSION_MAPPING = {}
+DEFAULT_PERMISSION_CLASSES = 2
+
+DIR_TO_UPLOAD_MAPPER = {"user": "pk"}

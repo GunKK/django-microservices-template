@@ -1,16 +1,15 @@
+import uuid
 from django.contrib.auth.models import AbstractBaseUser
 from django.core.validators import FileExtensionValidator
 from django.db import models
 from django_extensions.db.models import TimeStampedModel
 from django_softdelete.models import SoftDeleteModel
+from .managers import DeletedUserManager, GlobalUserManager, SoftDeleteUserManager
 
 from core.constant import USER_DEFAULT_SYSTEM, NotificationTypeEnum
 
-from .managers import UserManager
-
-
 class User(AbstractBaseUser, TimeStampedModel, SoftDeleteModel):
-    email = models.EmailField(unique=True, null=True, max_length=255)
+    username = models.CharField(unique=True, null=True, max_length=255)
     first_name = models.CharField(max_length=255, null=True)
     last_name = models.CharField(max_length=255, null=True)
     is_active = models.BooleanField(default=True)
@@ -25,22 +24,43 @@ class User(AbstractBaseUser, TimeStampedModel, SoftDeleteModel):
         ],
         max_length=255,
     )
-    status = models.BooleanField(default=False)
+    status = models.BooleanField(default=True)
 
-    objects = UserManager()
+    objects = SoftDeleteUserManager()
+    global_objects = GlobalUserManager()
+    deleted_objects = DeletedUserManager()
 
-    USERNAME_FIELD = "email"
+    USERNAME_FIELD = "username"
     REQUIRED_FIELDS = ["first_name", "last_name", "role", "password"]
+
+    token_version = models.UUIDField(default=uuid.uuid4)
 
     class Meta:
         db_table = "users"
 
     def __str__(self):
-        return self.email
+        return f"{self.pk} {self.username}"
 
     @property
     def full_name(self) -> str:
         return f"{self.first_name} {self.last_name}".strip()
+
+    def set_new_token_version(self):
+        """
+        Set a new token version (UUID) for the User.
+        """
+        self.token_version = uuid.uuid4()
+        self.save()
+
+    def get_new_token_version(self) -> str:
+        """
+        Get a new token version (UUID) for the User.
+        """
+        return str(self.token_version)
+
+    def is_token_version_valid(self, token_version: str) -> bool:
+        return bool(self.get_new_token_version() == token_version)
+
 
 class Notification(TimeStampedModel):
     user = models.ForeignKey(

@@ -15,6 +15,7 @@ from datetime import timedelta
 from pathlib import Path
 
 from dotenv import load_dotenv
+# from mongoengine import connect
 
 load_dotenv()
 
@@ -44,6 +45,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    # "rest_framework_mongoengine",
     "rest_framework.authtoken",
     "django_extensions",
     "debug_toolbar",
@@ -66,11 +68,11 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.TokenAuthentication",
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
-    "DEFAULT_PERMISSION_CLASSES": ("core.middlewares.authenticate.AuthenticateMiddleware",),
-    # "DEFAULT_PERMISSION_CLASSES": (
-    #     "core.middlewares.authenticate.AuthenticateMiddleware",
-    #     "core.middlewares.active_account.ActiveAccountMiddleware",
-    # ),
+    "DEFAULT_PERMISSION_CLASSES": (
+        "core.middlewares.authenticate.AuthenticateMiddleware",
+        "core.middlewares.active_account.ActiveAccountMiddleware",
+        "core.middlewares.check_token_version.TokenVersionMiddleware",
+    ),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "core.exceptions.custom_exception_handler",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
@@ -82,7 +84,7 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=15),
     "ROTATE_REFRESH_TOKENS": True,
-    "BLACKLIST_AFTER_ROTATION": False,
+    "BLACKLIST_AFTER_ROTATION": True,
     "ALGORITHM": "HS256",
     "SIGNING_KEY": os.environ.get("SECRET_KEY"),
     "VERIFYING_KEY": None,
@@ -92,6 +94,7 @@ SIMPLE_JWT = {
     "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
     "TOKEN_TYPE_CLAIM": "token_type",
     "JTI_CLAIM": "jti",
+    "TOKEN_OBTAIN_SERIALIZER": "core.jwt.MyTokenObtainPairSerializer",
 }
 
 MIDDLEWARE = [
@@ -104,9 +107,6 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "debug_toolbar.middleware.DebugToolbarMiddleware",
     "corsheaders.middleware.CorsMiddleware",
-    # "core.middlewares.blacklist_access_token.BlacklistAccessTokenMiddleware",
-    # "core.middlewares.translate.TranslateMiddleware",
-    # "simple_history.middleware.HistoryRequestMiddleware",
 ]
 
 CORS_ALLOW_ALL_ORIGINS = True
@@ -139,7 +139,7 @@ ASGI_APPLICATION = "app.asgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql_psycopg2", # mssql config for sql server
+        "ENGINE": "django.db.backends.postgresql_psycopg2",  # mssql config for sql server
         "NAME": os.environ.get("DB_NAME"),
         "USER": os.environ.get("DB_USER"),
         "PASSWORD": os.environ.get("DB_PASSWORD"),
@@ -149,6 +149,14 @@ DATABASES = {
     }
 }
 
+# mongodb engine config
+# connect(
+#     db=os.environ.get("MONGO_ROOT_DATABASE"),
+#     host=os.environ.get("MONGO_ROOT_HOST"),
+#     port=27017,
+#     username=os.environ.get("MONGO_ROOT_USERNAME"),
+#     password=os.environ.get("MONGO_ROOT_PASSWORD"),
+# )
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
@@ -200,14 +208,14 @@ INTERNAL_IPS = [
     "127.0.0.1",
 ]
 
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL")
-EMAIL_HOST = os.environ.get("EMAIL_HOST")
-EMAIL_PORT = os.environ.get("EMAIL_PORT")
-EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")
-EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
-EMAIL_USE_TLS = False  # True when port is 587
-EMAIL_USE_SSL = True  # True when port port 465
+# EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+# DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL")
+# EMAIL_HOST = os.environ.get("EMAIL_HOST")
+# EMAIL_PORT = os.environ.get("EMAIL_PORT")
+# EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")
+# EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
+# EMAIL_USE_TLS = False  # True when port is 587
+# EMAIL_USE_SSL = True  # True when port port 465
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Task manegement API Documentation",
@@ -220,8 +228,8 @@ SPECTACULAR_SETTINGS = {
 
 CELERY_BEAT_SCHEDULE = {}
 
-CELERY_BROKER_URL = os.getenv("CELERY_REDIS_URL", "redis://localhost:6379/0")
-CELERY_RESULT_BACKEND = os.getenv("CELERY_REDIS_URL", "redis://localhost:6379/0")
+CELERY_BROKER_URL = os.getenv("CELERY_REDIS_URL", "redis://192.168.160.33:6379/0")
+CELERY_RESULT_BACKEND = os.getenv("CELERY_REDIS_URL", "redis://192.168.160.33:6379/0")
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 
