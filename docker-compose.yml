@@ -57,6 +57,9 @@ services:
       - ./core:/usr/src/service/core
       - ./services/apschedule/pyproject.toml:/usr/src/service/pyproject.toml
       - ./services/apschedule/poetry.lock:/usr/src/service/poetry.lock
+      - ./services/apschedule/.env:/usr/src/service/.env
+    ports:
+      - 9013:8000
 
     depends_on:
       - redis

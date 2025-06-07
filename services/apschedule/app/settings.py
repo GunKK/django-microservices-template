@@ -14,10 +14,11 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
-from celery.schedules import crontab
 from dotenv import load_dotenv
+# from mongoengine import connect
 
 load_dotenv()
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -44,6 +45,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    # "rest_framework_mongoengine",
     "rest_framework.authtoken",
     "django_extensions",
     "debug_toolbar",
@@ -66,11 +68,16 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.TokenAuthentication",
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
-    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
+    "DEFAULT_PERMISSION_CLASSES": (
+        "core.middlewares.authenticate.AuthenticateMiddleware",
+        "core.middlewares.active_account.ActiveAccountMiddleware",
+        "core.middlewares.check_token_version.TokenVersionMiddleware",
+    ),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "core.exceptions.custom_exception_handler",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend",),
+    "COERCE_DECIMAL_TO_STRING": False,
 }
 
 SIMPLE_JWT = {
@@ -87,6 +94,7 @@ SIMPLE_JWT = {
     "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
     "TOKEN_TYPE_CLAIM": "token_type",
     "JTI_CLAIM": "jti",
+    "TOKEN_OBTAIN_SERIALIZER": "core.jwt.MyTokenObtainPairSerializer",
 }
 
 MIDDLEWARE = [
@@ -99,8 +107,6 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "debug_toolbar.middleware.DebugToolbarMiddleware",
     "corsheaders.middleware.CorsMiddleware",
-    "core.middlewares.blacklist_access_token.BlacklistAccessTokenMiddleware",
-    "simple_history.middleware.HistoryRequestMiddleware",
 ]
 
 CORS_ALLOW_ALL_ORIGINS = True
@@ -125,6 +131,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "app.wsgi.application"
+ASGI_APPLICATION = "app.asgi.application"
 
 
 # Database
@@ -132,15 +139,24 @@ WSGI_APPLICATION = "app.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql_psycopg2",
+        "ENGINE": "django.db.backends.postgresql_psycopg2",  # mssql config for sql server
         "NAME": os.environ.get("DB_NAME"),
         "USER": os.environ.get("DB_USER"),
         "PASSWORD": os.environ.get("DB_PASSWORD"),
         "HOST": os.environ.get("DB_HOST"),
         "PORT": os.environ.get("DB_PORT"),
+        # "OPTIONS": {"driver": "ODBC Driver 17 for SQL Server",}
     }
 }
 
+# mongodb engine config
+# connect(
+#     db=os.environ.get("MONGO_ROOT_DATABASE"),
+#     host=os.environ.get("MONGO_ROOT_HOST"),
+#     port=27017,
+#     username=os.environ.get("MONGO_ROOT_USERNAME"),
+#     password=os.environ.get("MONGO_ROOT_PASSWORD"),
+# )
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
@@ -192,14 +208,14 @@ INTERNAL_IPS = [
     "127.0.0.1",
 ]
 
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL")
-EMAIL_HOST = os.environ.get("EMAIL_HOST")
-EMAIL_PORT = os.environ.get("EMAIL_PORT")
-EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")
-EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
-EMAIL_USE_TLS = False
-EMAIL_USE_SSL = False
+# EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+# DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL")
+# EMAIL_HOST = os.environ.get("EMAIL_HOST")
+# EMAIL_PORT = os.environ.get("EMAIL_PORT")
+# EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")
+# EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
+# EMAIL_USE_TLS = False  # True when port is 587
+# EMAIL_USE_SSL = True  # True when port port 465
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Task manegement API Documentation",
@@ -210,34 +226,10 @@ SPECTACULAR_SETTINGS = {
     "COMPONENT_SPLIT_REQUEST": True,  # Allow upload binary file
 }
 
-# path lỗi
+CELERY_BEAT_SCHEDULE = {}
 
-CELERY_BEAT_SCHEDULE = {
-    "update-task-status-every-day": {
-        "task": "app.celery.update_project_status",
-        "schedule": crontab(
-            hour=os.getenv("CRON_JOBS_TIME_HOUR", "00"),
-            minute=os.getenv("CRON_JOBS_TIME_MINUTE", "00"),
-        ),
-    },
-    "update-project-status-every-day": {
-        "task": "app.celery.update_task_status",
-        "schedule": crontab(
-            hour=os.getenv("CRON_JOBS_TIME_HOUR", "00"),
-            minute=os.getenv("CRON_JOBS_TIME_MINUTE", "00"),
-        ),
-    },
-    "update-start-task-every-day": {
-        "task": "app.celery.update_start_task",
-        "schedule": crontab(
-            hour=os.getenv("CRON_JOBS_TIME_HOUR", "00"),
-            minute=os.getenv("CRON_JOBS_TIME_MINUTE", "00"),
-        ),
-    },
-}
-
-CELERY_BROKER_URL = os.getenv("CELERY_REDIS_URL", "redis://localhost:6379/0")
-CELERY_RESULT_BACKEND = os.getenv("CELERY_REDIS_URL", "redis://localhost:6379/0")
+CELERY_BROKER_URL = os.getenv("CELERY_REDIS_URL", "redis://192.168.160.33:6379/0")
+CELERY_RESULT_BACKEND = os.getenv("CELERY_REDIS_URL", "redis://192.168.160.33:6379/0")
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 
@@ -273,3 +265,5 @@ CHANNEL_LAYERS = {
 # APPEND_SLASH = False
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+
+SIMPLE_HISTORY_HISTORY_CHANGE_REASON_USE_TEXT_FIELD = True
